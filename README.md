@@ -1,5 +1,66 @@
 # tools
 
+## MOVE_DATA_HIGH.JS
+
+**move_data_high.js** moves the roster data, the graphics and the player-card data to the end of the ROM and keeps the short-address code at the bottom.
+
+**_What the script changes:_**  
+**nhl94.asm:** 
+teamdata94, the new cardsdata94 and graphics94 are now included after checksum94. The old 1 MB pad line is removed. fixrom.js pads the ROM to the next size.   
+
+**cards94.asm:** 
+the code stays put. Other files call it with bsr.w, which only reaches about 32 KB. Only its data block (TeamPalettes, FeaturedPictures, 56 picture files) moves to the new cardsdata94.asm. The script refuses to move that block if it finds anything that isn’t plain data.
+20 places in other files: movea.w #TeamList and movea.w #NoTiles become movea.l. Those two labels used to sit below $8000. There is no other source change.
+
+To use it, put move_data_high.js in your NHL94Genesis folder and run **node move_data_high.js**, then **npm run build:dev**. Your originals are saved in backup_before_highdata, and node move_data_high.js **--undo** restores them.
+
+build:retail will now report a mismatch, which you’ve said is fine.
+
+## EXPAND_BANNERS.JS
+
+expand_banners.js gives every team its own full 11×2-tile (88×16 px) banner. I built it into a ROM and compared screenshots against the original, and the banners come out pixel-identical.
+
+### **What changes**  
+**Before:** 
+both banner files store only the unique tiles (501 and 398). A tile that repeats inside a banner, or is its mirror image, is stored once.  
+
+**After:** 
+each team has 22 tiles, one per screen cell, in screen order. That makes 616 tiles per file for 28 teams. Mirrored tiles become real pixels, so each cell can be edited alone.  
+
+**Where to edit:** 
+team N’s banner starts at file offset 10 + N × 704. Open the file as 4bpp Genesis tiles, 11 across, and each team shows as a 2-row picture.  
+
+**Files:** 
+the new files go in Custom\Graphics\TeamBlocks.map.jim and TeamBlocks94.map.jim. The build never overwrites that folder.
+
+
+The setup screen and the in-game scoreboard needed code changes. Storing 616 tiles per file doesn’t fit in the game’s graphics memory (VRAM) the way the old loading worked. The setup screen would have needed about 1,230 tiles in VRAM and only has room for roughly 1,400. So the script also patches setup94.asm, optsetup94.asm, attract94.asm and tools/prebuild.js:
+
+**Setup screen:** only the two banners on screen are loaded into VRAM, 22 tiles each. They are loaded when drawn, and the visitor banner is colour-swapped as before.
+**In-game scoreboard:** the two banners are copied from the ROM to VRAM directly, so there’s no ~500-tile scratch area any more.
+**Playoff screen**: needs no code change. Its tree rendered correctly in my test.
+
+### **What I tested**
+
+**Build:** it builds with 0 errors.
+**Setup screen:** 19 frames, cycling teams on both sides, were pixel-identical to the original.
+**Pause-screen scoreboard:** identical across 6 team pairings.
+**Playoff screen**: rendered correctly, as above.
+**Not tested:** I haven’t run the game further than the setup, pause and playoff screens.
+
+### **To use it**
+
+Run **move_data_high.js** first. The expanded files add about 14 KB, which doesn’t fit in the old 1 MB layout, and the script stops and tells you if you skip this.
+
+Put expand_banners.js in your NHL94Genesis folder and run node expand_banners.js, then npm run build:dev.
+
+**--undo** restores your source files. It leaves your Custom\Graphics files alone.
+Run it once on its own. It can run again safely: it keeps your edited files and doesn’t re-patch.
+
+The ROM grows to 1.5 MB, because the expanded graphics push the content past 1 MB.
+
+This is also the right base for Sudbury. A new team is now just 22 more tiles and 2 map rows in each file, with no sharing to work around. If you want, I’ll redo Sudbury on top of this with its own TeamBlocks, TeamBlocks94 and logoSUD.
+
 ## **BMP2JIM.JS**
 
 ### **Commands**
